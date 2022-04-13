@@ -49,6 +49,7 @@ lost = False
 # Show instructions initially
 instructions = True
 setToRun = False
+queue = []
 
 while True:
 
@@ -120,10 +121,10 @@ while True:
             elif (i, j) in flags:
                 screen.blit(flag, rect)
             elif (i, j) in revealed:
-                neighbors = smallFont.render(
-                    str(game.nearby_mines((i, j))),
-                    True, BLACK
-                )
+                neighbors = smallFont.render(str(game.nearby_mines((i, j))),True, BLACK)
+                if game.nearby_mines((i, j)) == 0:
+                    queue = game.getSurrounding((i,j))
+                    print(queue)
                 neighborsTextRect = neighbors.get_rect()
                 neighborsTextRect.center = rect.center
                 screen.blit(neighbors, neighborsTextRect)
