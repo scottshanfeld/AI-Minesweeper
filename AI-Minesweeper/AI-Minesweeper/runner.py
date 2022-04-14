@@ -183,8 +183,19 @@ while True:
     elif left == 1:
         mouse = pygame.mouse.get_pos()
 
+        # Reset game state
+        if resetButton.collidepoint(mouse):
+            game = Minesweeper(height=HEIGHT, width=WIDTH, mines=MINES)
+            ai = MinesweeperAI(height=HEIGHT, width=WIDTH)
+            revealed = set()
+            flags = set()
+            lost = False
+            setToRun = False
+            print("Reset Clicked")
+            continue
+
         # If AI button clicked, make an AI move
-        if (aiButton.collidepoint(mouse) and not lost) or (setToRun and not lost):
+        elif (aiButton.collidepoint(mouse) and not lost) or (setToRun and not lost):
             setToRun = True
             move = ai.make_safe_move()
             if move is None:
@@ -199,14 +210,6 @@ while True:
                 print("AI making safe move.")
             time.sleep(0.2)
 
-        # Reset game state
-        elif resetButton.collidepoint(mouse):
-            game = Minesweeper(height=HEIGHT, width=WIDTH, mines=MINES)
-            ai = MinesweeperAI(height=HEIGHT, width=WIDTH)
-            revealed = set()
-            flags = set()
-            lost = False
-            continue
 
         # User-made move
         elif not lost:
