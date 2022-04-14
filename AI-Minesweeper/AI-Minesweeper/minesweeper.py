@@ -92,7 +92,7 @@ class Minesweeper():
                 if (i, j) == cell:
                     continue
 
-                # Update count if cell in bounds and is mine
+                # Update count if cell in bounds
                 if 0 <= i < self.height and 0 <= j < self.width:
                     queue.append((i, j))
 
