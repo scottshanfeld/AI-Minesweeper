@@ -92,7 +92,7 @@ class Minesweeper():
                 if (i, j) == cell:
                     continue
 
-                # Update count if cell in bounds
+                # Update count if cell in bounds and is mine
                 if 0 <= i < self.height and 0 <= j < self.width:
                     queue.append((i, j))
 
@@ -183,6 +183,17 @@ class MinesweeperAI(): #This is the main function to edit
 
         # List of sentences about the game known to be true
         self.knowledge = []
+        self.bomb_chance = {}
+        self.bomb_chance_surrounding = {}
+        for i in range(height):
+            for j in range(width):
+                coord = str(i)+ ", "+ str(j)
+                self.bomb_chance.update({coord : 0})
+        for k in range(height):
+            for m in range(width):
+                coord = str(k)+ ", "+ str(m)
+                self.bomb_chance_surrounding.update({coord : 0})
+        print(self.bomb_chance)
 
     def mark_mine(self, cell):
         """
