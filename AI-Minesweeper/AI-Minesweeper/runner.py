@@ -124,7 +124,7 @@ while True:
                 neighbors = smallFont.render(str(game.nearby_mines((i, j))),True, BLACK)
                 if game.nearby_mines((i, j)) == 0:
                     queue = game.getSurrounding((i,j))
-                    print(queue)
+                    #print(queue)
                 neighborsTextRect = neighbors.get_rect()
                 neighborsTextRect.center = rect.center
                 screen.blit(neighbors, neighborsTextRect)
@@ -229,5 +229,6 @@ while True:
             nearby = game.nearby_mines(move)
             revealed.add(move)
             ai.add_knowledge(move, nearby)
+            print(game.scan_all_sections(4, revealed))
 
     pygame.display.flip()
