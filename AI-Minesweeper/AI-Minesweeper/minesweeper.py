@@ -98,6 +98,29 @@ class Minesweeper():
 
         return queue
 
+    def scan_section(self,start, size, revealed):
+        board_data = []
+        for i in range(size):
+            x = i + start[0]
+            for j in range(size):
+                y = j + start[1]
+                if(x >= self.height or y >= self.width): #marks area outside board as -2
+                    board_data.append(-2)
+                elif (self.is_mine((x, y))):  # marks bomb tiles as -1
+                    board_data.append(-1)
+                elif((x,y) in revealed):
+                    board_data.append(self.nearby_mines((x,y))) #marks tile with number of bombs surround otherwise
+                else:
+                    board_data.append(-3) #markes tile with -3 if unknown
+        return(board_data)
+
+    def scan_all_sections(self, size, revealed):
+        sections = []
+        for i in range(0,self.height, size):
+            for j in range(0, self.width, size):
+                sections.append(self.scan_section((i,j),size, revealed))
+        return sections
+
 class Sentence():
     """
     Logical statement about a Minesweeper game
@@ -302,4 +325,7 @@ class MinesweeperAI(): #This is the main function to edit
                 #print(f"make random move running {(i,j)}")
                 return (i,j)
         return None
+
+
+
 
