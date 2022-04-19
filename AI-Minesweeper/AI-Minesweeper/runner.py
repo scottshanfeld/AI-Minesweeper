@@ -40,6 +40,7 @@ mine = pygame.transform.scale(mine, (cell_size, cell_size))
 # Create game and AI agent
 game = Minesweeper(height=HEIGHT, width=WIDTH, mines=MINES)
 ai = MinesweeperAI(height=HEIGHT, width=WIDTH)
+ai2 = MinesweeperAI(height=HEIGHT, width=WIDTH)
 
 # Keep track of revealed cells, flagged cells, and if a mine was hit
 revealed = set()
@@ -134,18 +135,29 @@ while True:
 
     # AI Move button
     aiButton = pygame.Rect(
-        (2 / 3) * width + BOARD_PADDING, (1 / 3) * height - 50,
+        (2 / 3) * width + BOARD_PADDING, (1 / 3) * height - 70,
         (width / 3) - BOARD_PADDING * 2, 50
     )
-    buttonText = mediumFont.render("AI Move", True, BLACK)
+    buttonText = mediumFont.render("AI - 1", True, BLACK)
     buttonRect = buttonText.get_rect()
     buttonRect.center = aiButton.center
     pygame.draw.rect(screen, WHITE, aiButton)
     screen.blit(buttonText, buttonRect)
 
+    # 2nd AI button
+    aiButton2 = pygame.Rect(
+        (2 / 3) * width + BOARD_PADDING, (1 / 3) * height + 10,
+        (width / 3) - BOARD_PADDING * 2, 50
+    )
+    buttonText = mediumFont.render("AI - 2", True, BLACK)
+    buttonRect = buttonText.get_rect()
+    buttonRect.center = aiButton2.center
+    pygame.draw.rect(screen, WHITE, aiButton2)
+    screen.blit(buttonText, buttonRect)
+
     # Reset button
     resetButton = pygame.Rect(
-        (2 / 3) * width + BOARD_PADDING, (1 / 3) * height + 20,
+        (2 / 3) * width + BOARD_PADDING, (1 / 3) * height + 110,
         (width / 3) - BOARD_PADDING * 2, 50
     )
     buttonText = mediumFont.render("Reset", True, BLACK)
@@ -158,7 +170,7 @@ while True:
     text = "Lost" if lost else "Won" if game.mines == flags else ""
     text = mediumFont.render(text, True, WHITE)
     textRect = text.get_rect()
-    textRect.center = ((5 / 6) * width, (2 / 3) * height)
+    textRect.center = ((5 / 6) * width, (2 / 3) * height + 60)
     screen.blit(text, textRect)
 
     move = None
@@ -187,6 +199,7 @@ while True:
         if resetButton.collidepoint(mouse):
             game = Minesweeper(height=HEIGHT, width=WIDTH, mines=MINES)
             ai = MinesweeperAI(height=HEIGHT, width=WIDTH)
+            ai2 = MinesweeperAI(height=HEIGHT, width=WIDTH)
             revealed = set()
             flags = set()
             lost = False
@@ -202,6 +215,21 @@ while True:
                 move = ai.make_random_move()
                 if move is None:
                     flags = ai.mines.copy()
+                    print("No moves left to make.")
+                    setToRun = False
+                else:
+                    print("No known safe moves, AI making random move.")
+            else:
+                print("AI making safe move.")
+            time.sleep(0.2)
+
+        elif (aiButton2.collidepoint(mouse) and not lost) or (setToRun and not lost):
+            setToRun = True
+            move = ai2.make_safe_move()
+            if move is None:
+                move = ai2.make_random_move()
+                if move is None:
+                    flags = ai2.mines.copy()
                     print("No moves left to make.")
                     setToRun = False
                 else:
@@ -229,6 +257,7 @@ while True:
             nearby = game.nearby_mines(move)
             revealed.add(move)
             ai.add_knowledge(move, nearby)
+            ai2.add_knowledge(move, nearby)
             print(game.scan_all_sections(4, revealed))
 
     pygame.display.flip()
