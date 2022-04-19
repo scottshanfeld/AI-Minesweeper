@@ -258,6 +258,6 @@ while True:
             revealed.add(move)
             ai.add_knowledge(move, nearby)
             ai2.add_knowledge(move, nearby)
-            print(game.scan_all_sections(4, revealed))
+            print(game.scan_section((0,0),4, revealed))
 
     pygame.display.flip()
