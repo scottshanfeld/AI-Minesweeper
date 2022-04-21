@@ -7,6 +7,7 @@ import pandas as pd
 import seaborn as sns
 
 
+
 class Minesweeper():
     """
     Minesweeper game representation
@@ -125,6 +126,25 @@ class Minesweeper():
             for j in range(0, self.width, size):
                 sections.append(self.scan_section((i,j),size, revealed))
         return sections
+
+    def scan_all_sections_with_safes(self, size, revealed):
+        sections = []
+        section = []
+        safes_section = []
+        for i in range(0,self.height, size):
+            for j in range(0, self.width, size):
+                section = self.scan_section((i,j),size, revealed)
+                safes_section = []
+                for k in range(len(section)):
+                    if(section[k] == -1):
+                        section[k] = -3
+                        safes_section.append(0)
+                    else:
+                        safes_section.append(1)
+                sections.append(section + safes_section)
+        return sections
+
+
 
 class Sentence():
     """
@@ -332,48 +352,49 @@ class MinesweeperAI(): #This is the main function to edit
         return None
 
     '''def NN(self, gridVector):
-        n = len(gridVector) # n is amount of features being processed
-        df = gridVector #might need a specific method to read as dataframe -- likely edit
         from sklearn.model_selection import train_test_split
-        x = gridVector #might need a different format -- likely edit
-        y = not Minesweeper.is_mine(i,j) #this should be a set of all coords that are safe to click. failure if coord is mine  -- likely edit what is there now
-        x_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=102)
         from sklearn.preprocessing import MinMaxScaler #normalize and scale feature data
+        from tensorflow.keras.models import Sequential
+        from tensorflow.keras.layers import Dense
+        from sklearn.metrics import mean_absolute_error, mean_squared_error
+        import numpy as ny
+        import pandas as pd
+        import seaborn as sns
+        df=pd.read_csv('board_data.csv')
+        df.head()
+        x=df[['(0;0)', '(1;0)', '(2;0)', '(3;0)', '(0;1)', '(1;1)', '(2;1)', '(3;1)', '(0;2)', '(1;2)', '(2;2)', '(3;2)', '(0;3)', '(1;3)', '(2;3)', '(3;3)']].values
+        y=df[['s(0;0)', 's(1;0)', 's(2;0)', 's(3;0)', 's(0;1)', 's(1;1)', 's(2;1)', 's(3;1)', 's(0;2)', 's(1;2)', 's(2;2)', 's(3;2)', 's(0;3)', 's(1;3)', 's(2;3)', 's(3;3)']].values
+        n = x.shape[1] # n is amount of features being processed
+        x_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=102)
         scaler = MinMaxScaler()
         scaler.fit(x_train)
         x_train = scaler.transform(x_train)
         X_test = scaler.transform(X_test)
-
-        #create nn model
-        from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import Dense
         model = Sequential()
         model.add(Dense((10 * n), activation='relu'))  # 1st layer -- input layer
         model.add(Dense((20 * n), activation='relu'))  # 2nd layer
         model.add(Dense((10 * n), activation='relu'))  # 3rd layer
-        model.add(Dense((5 * n), activation='relu'))   # 4th layer
+        model.add(Dense((5 * n), activation='sigmoid'))   # 4th layer
         model.add(Dense(n))                            # output (may change n to 1 if we decide to only have 1 output. Currently set up to output a percent chance of a bomb at a given space)
         model.compile(optimizer='rmsprop', loss='mse') # 'mse'-> mean square error
-        model.fit(x=x_train, y=y_train, epochs=250)    #epochs -> number of pass over the entired dataset ->this is where neural network is run
+        model.fit(x=x_train, y=y_train, epochs=500)    #epochs -> number of pass over the entired dataset ->this is where neural network is run
         loss_df = pd.DataFrame(model.history.history)
-
         #Evaluation of Data -- will show us how often ai fails game (clicked a bomb)
         model.evaluate(X_test, y_test, verbose=0) # returns mean square error
         model.evaluate(x_train, y_train, verbose=0)
         test_predictions = model.predict(X_test)
-        test_predictions = pd.Series(test_predictions.reshape(300, )) #converting to dataframe
-        pred_df = pd.DataFrame(y_test, columns=['Org Y'])
+        test_predictions = pd.Series(test_predictions.flatten()) #converting to dataframe
+        pred_df = pd.DataFrame(y_test, columns=['orig s(0;0)', 'orig s(1;0)', 'orig s(2;0)', 'orig s(3;0)', 'orig s(0;1)', 'orig s(1;1)', 'orig s(2;1)', 'orig s(3;1)', 'orig s(0;2)', 'orig s(1;2)', 'orig s(2;2)', 'orig s(3;2)', 'orig s(0;3)', 'orig s(1;3)', 'orig s(2;3)', 'orig s(3;3)'])
         pred_df = pd.concat([pred_df, test_predictions], axis=1)
-        pred_df.columns = ['OrgY', 'Predictions']
-        from sklearn.metrics import mean_absolute_error, mean_squared_error
-        mean_absolute_error(pred_df['OrgY'], pred_df['Predictions'])
-
+        pred_df.columns = ['orig s(0;0)', 'orig s(1;0)', 'orig s(2;0)', 'orig s(3;0)', 'orig s(0;1)', 'orig s(1;1)', 'orig s(2;1)', 'orig s(3;1)', 'orig s(0;2)', 'orig s(1;2)', 'orig s(2;2)', 'orig s(3;2)', 'orig s(0;3)', 'orig s(1;3)', 'orig s(2;3)', 'orig s(3;3)', 'Predictions']
         #Saves model
         from tensorflow.keras.models import load_model
         model.save('my_minesweeper_model.h5')
-
         #loads model
-        my_model = load_model('my_minesweeper_model.h5')'''
+        my_model = load_model('my_minesweeper_model.h5')  
+        board_state = pd.DataFrame ([[-3,-3,-3,-3,-3,1,-3,4,-3,-3,-3,-3,-3,-3,-3,-3]], columns = ['(0;0)', '(1;0)', '(2;0)', '(3;0)', '(0;1)', '(1;1)', '(2;1)', '(3;1)', '(0;2)', '(1;2)', '(2;2)', '(3;2)', '(0;3)', '(1;3)', '(2;3)', '(3;3)'])
+        model.predict(board_state)        
+'''
 
 
 
