@@ -3,10 +3,11 @@ import sys
 import time
 
 from minesweeper import Minesweeper, MinesweeperAI
+from csv import writer
 
-HEIGHT = 10
-WIDTH = 10
-MINES = 10
+HEIGHT = 8
+WIDTH = 8
+MINES = 8
 
 # Colors
 BLACK = (0, 0, 0)
@@ -258,6 +259,15 @@ while True:
             revealed.add(move)
             ai.add_knowledge(move, nearby)
             ai2.add_knowledge(move, nearby)
-            print(game.scan_section((0,0),4, revealed))
+            
+            #data collection---------------------------------------------------------
+            data = game.scan_all_sections_with_safes(4, revealed)
 
+            for eachList in data:
+                if(eachList[:16] != [-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3]):
+                    with open('board_data.csv', 'a', newline ='') as f: #file heading: (0;0), (1;0), (2;0), (3;0), (0;1), (1;1), (2;1), (3;1), (0;2), (1;2), (2;2), (3;2), (0;3), (1;3), (2;3), (3;3), s(0;0), s(1;0), s(2;0), s(3;0), s(0;1), s(1;1), s(2;1), s(3;1), s(0;2), s(1;2), s(2;2), s(3;2), s(0;3), s(1;3), s(2;3), s(3;3)
+                        writer_obj = writer(f)
+                        writer_obj.writerow(eachList)
+                        f.close()
+            #-----------------------------------------------------------------------
     pygame.display.flip()
