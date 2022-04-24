@@ -5,9 +5,9 @@ import time
 from minesweeper import Minesweeper, MinesweeperAI
 from csv import writer
 
-HEIGHT = 8
-WIDTH = 8
-MINES = 8
+HEIGHT = 12
+WIDTH = 12
+MINES = 25
 
 # Colors
 BLACK = (0, 0, 0)
@@ -51,6 +51,8 @@ lost = False
 # Show instructions initially
 instructions = True
 setToRun = False
+x=0
+y=0
 queue = []
 
 while True:
@@ -150,7 +152,7 @@ while True:
         (2 / 3) * width + BOARD_PADDING, (1 / 3) * height + 10,
         (width / 3) - BOARD_PADDING * 2, 50
     )
-    buttonText = mediumFont.render("AI - 2", True, BLACK)
+    buttonText = mediumFont.render("AI - ANN", True, BLACK)
     buttonRect = buttonText.get_rect()
     buttonRect.center = aiButton2.center
     pygame.draw.rect(screen, WHITE, aiButton2)
@@ -205,6 +207,8 @@ while True:
             flags = set()
             lost = False
             setToRun = False
+            x=0
+            y=0
             print("Reset Clicked")
             continue
 
@@ -226,7 +230,16 @@ while True:
 
         elif (aiButton2.collidepoint(mouse) and not lost) or (setToRun and not lost):
             setToRun = True
-            move = ai2.make_safe_move()
+            if(x == WIDTH - 4):
+                y += 1
+                x = 0
+            else:
+                x+=1
+
+            if(y == HEIGHT - 4):
+                y=0
+
+            move = ai2.make_nn_move(game.scan_section((x,y)))
             if move is None:
                 move = ai2.make_random_move()
                 if move is None:
@@ -253,14 +266,14 @@ while True:
     if move:
         if game.is_mine(move):
             setToRun = False
+            x=0
+            y=0
             lost = True
         else:
             nearby = game.nearby_mines(move)
             revealed.add(move)
             ai.add_knowledge(move, nearby)
             ai2.add_knowledge(move, nearby)
-            
-            #data collection---------------------------------------------------------
             data = game.scan_all_sections_with_safes(4, revealed)
 
             for eachList in data:
@@ -269,5 +282,4 @@ while True:
                         writer_obj = writer(f)
                         writer_obj.writerow(eachList)
                         f.close()
-            #-----------------------------------------------------------------------
     pygame.display.flip()
