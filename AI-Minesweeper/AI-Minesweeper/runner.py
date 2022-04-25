@@ -4,14 +4,21 @@ import time
 
 from minesweeper import Minesweeper, MinesweeperAI
 from csv import writer
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler #normalize and scale feature data
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-HEIGHT = 12
-WIDTH = 12
-MINES = 25
+HEIGHT = 8
+WIDTH = 8
+MINES = 2
 
 # Colors
 BLACK = (0, 0, 0)
 GRAY = (180, 180, 180)
+RED = (255,0,0)
+BLUE = (0,0,255)
 WHITE = (255, 255, 255)
 
 # Create game
@@ -50,7 +57,8 @@ lost = False
 
 # Show instructions initially
 instructions = True
-setToRun = False
+setToRun1 = False
+setToRun2 = False
 x=0
 y=0
 queue = []
@@ -178,7 +186,7 @@ while True:
 
     move = None
 
-    if setToRun:
+    if setToRun1 or setToRun2:
         left = 1
     else:
         left, _, right = pygame.mouse.get_pressed()
@@ -206,15 +214,17 @@ while True:
             revealed = set()
             flags = set()
             lost = False
-            setToRun = False
+            setToRun1 = False
+            setToRun2 = False
             x=0
             y=0
             print("Reset Clicked")
             continue
 
         # If AI button clicked, make an AI move
-        elif (aiButton.collidepoint(mouse) and not lost) or (setToRun and not lost):
-            setToRun = True
+        elif (aiButton.collidepoint(mouse) and not lost) or (setToRun1 and not lost):
+            print("AI 1")
+            setToRun1 = True
             move = ai.make_safe_move()
             if move is None:
                 move = ai.make_random_move()
@@ -226,30 +236,62 @@ while True:
                     print("No known safe moves, AI making random move.")
             else:
                 print("AI making safe move.")
-            time.sleep(0.2)
+            time.sleep(0.01)
 
-        elif (aiButton2.collidepoint(mouse) and not lost) or (setToRun and not lost):
-            setToRun = True
+        elif (aiButton2.collidepoint(mouse) and not lost) or (setToRun2 and not lost):
+            setToRun2 = True
+            print("AI 2")
             if(x == WIDTH - 4):
                 y += 1
                 x = 0
             else:
                 x+=1
 
-            if(y == HEIGHT - 4):
+            if(y == HEIGHT - 3):
                 y=0
 
-            move = ai2.make_nn_move(game.scan_section((x,y)))
+            print("Scan Start: ", (x,y), "--- Scan End:", (x + 3, y + 3))
+            #------------------------------------------------
+            rect = pygame.Rect(
+                board_origin[0] + x * cell_size,
+                board_origin[1] + y * cell_size,
+                cell_size, cell_size
+            )
+            pygame.draw.rect(screen, RED, rect)
+
+            rect = pygame.Rect(
+                board_origin[0] + (x + 3) * cell_size,
+                board_origin[1] + (y + 3) * cell_size,
+                cell_size, cell_size
+            )
+            pygame.draw.rect(screen, RED, rect)
+            #------------------------------------------------
+            move = ai2.make_nn_move(game.scan_section((x,y),4,revealed),x,y)
+
             if move is None:
-                move = ai2.make_random_move()
+                move = (int(WIDTH / 2), int(HEIGHT / 2))
+                print("Middle: ", move)
                 if move is None:
                     flags = ai2.mines.copy()
                     print("No moves left to make.")
-                    setToRun = False
+                    setToRun2 = False
                 else:
-                    print("No known safe moves, AI making random move.")
+                    print("No known safe moves.")
             else:
-                print("AI making safe move.")
+                move = (move[0] + x, move[1] + y)
+                print("Move: ", move)
+                move = (move[1], move[0])
+                print("AI making most probable move.")
+                #---------------------------------------------
+                rect = pygame.Rect(
+                    board_origin[0] + move[1] * cell_size,
+                    board_origin[1] + move[0] * cell_size,
+                    cell_size, cell_size
+                )
+                pygame.draw.rect(screen, BLUE, rect)
+                #----------------------------------------------
+                if move in revealed:
+                    print("REPEATED MOVE: ", move)
             time.sleep(0.2)
 
 
@@ -265,7 +307,8 @@ while True:
     # Make move and update AI knowledge
     if move:
         if game.is_mine(move):
-            setToRun = False
+            setToRun1 = False
+            setToRun2 = False
             x=0
             y=0
             lost = True
