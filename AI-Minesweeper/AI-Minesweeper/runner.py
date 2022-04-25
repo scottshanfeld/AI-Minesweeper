@@ -236,7 +236,7 @@ while True:
                     print("No known safe moves, AI making random move.")
             else:
                 print("AI making safe move.")
-            time.sleep(0.01)
+            time.sleep(0.2) #change to speed up game
 
         elif (aiButton2.collidepoint(mouse) and not lost) or (setToRun2 and not lost):
             setToRun2 = True
