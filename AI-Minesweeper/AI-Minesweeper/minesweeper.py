@@ -284,7 +284,9 @@ class MinesweeperAI(): #This is the main function to edit
         self.moves_made.add(cell)       #1.
         #print("1 executed")
         
-        self.mark_safe(cell)            #2.
+        self.gameBN()
+        if cell in resA and tuple_of_probs[cell]>= .5:
+            self.mark_safe(cell)            #2.
         #print("2 executed")
                 
         cells = set()                   #3.
@@ -349,7 +351,7 @@ class MinesweeperAI(): #This is the main function to edit
         """
         while len(self.moves_made.union(self.mines))< 64-len(self.mines):
             i,j = random.randrange(0,self.width),random.randrange(0,self.height)
-            if (i,j) in self.moves_made.union(self.mines):
+            if (i,j) in self.moves_made.union(self.mines) and (i,j) in self.resA:
                 self.make_random_move()
             else:
                 #print(f"make random move running {(i,j)}")
@@ -390,7 +392,65 @@ class MinesweeperAI(): #This is the main function to edit
         else:
             print("No moves in this section.")
 
+#creates a discrete bayesian network to infer moves and calculate Cumulative Probability Distributions or CPDs 
+def gameBN():
+        graph = []
+        #Here we are finding all the neighbours for each Y and creating a collection of nodes and edges
+        for i in range(width):
+            for j in range(height):
+                neighbours = game.neighbours_of_position(i,j)
+                for x in range(0,len(neighbours)):
+                    graph.append((neighbours[x],"Y" + str(i) + str(j)))
+                
+                
+        game_network = pgmm.BayesianModel(graph)
+    
+        modelnodes = game_network.nodes()
+        modelnodesY = game_network.nodes()
 
 
+        res  = [s for s in modelnodes if 'X' in s] 
+
+        for i in range(0,len(res)):
+            cpd_gameX =  "cpd_current_game"+(res[i])
+            cpd_gameX = pgmf.TabularCPD(res[i],2,[[bombProbability,noBombProbability]])
+            game_network.add_cpds(cpd_game)
+        
+        resY  = [s for s in modelnodesY if 'Y' in s]
+    
+        for l in range(0,len(resY)):
+            i = resY[l][1:2]
+            j = resY[l][2:3]
+            neighbours = game.neighbours_of_position(int(i),int(j))
+            listOpt = [0,1]
+
+            resA = list(product(listOpt,repeat = len(neighbours)))
+        
+        #adds all the number of bombs
+            def counterPermutations(lsa):
+                count = 0
+                for f in range(len(lsa)):
+                    if lsa[f] == 1:
+                        count = count + 1
+                return count
+    
+            tuple_of_probs = []
+            for v in range(len(neighbours)+1):
+                calculated_prob = []
+                for a in range(len(resA)):
+                    listA = resA[a]
+                    counter = counterPermutations(listA)
+                    if counter is v:
+                        calculated_prob.append(1)
+                    else:
+                        calculated_prob.append(0)
+                tuple_of_probs.append(calculated_prob)
+        
+        
+            cpd_resY =  "cpd_res"+(resY[l])
+            cpd_resY = pgmf.TabularCPD(resY[l],len(neighbours)+1,tuple_of_probs,neighbours,[2]*len(neighbours))
+            game_network.add_cpds(cpd_resY)
+
+        return game_network
 
 
