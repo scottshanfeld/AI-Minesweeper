@@ -1,328 +1,396 @@
-import pygame
-import sys
-import time
-
-from minesweeper import Minesweeper, MinesweeperAI
-from csv import writer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler #normalize and scale feature data
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from tensorflow.keras.models import load_model
 
-HEIGHT = 12 #keep this a multiple of 4 and same as width
-WIDTH = 12
-MINES = 5
+import itertools
+import random
+import numpy as ny
+import pandas as pd
+import seaborn as sns
 
-# Colors
-BLACK = (0, 0, 0)
-GRAY = (180, 180, 180)
-RED = (255,0,0)
-BLUE = (0,0,255)
-WHITE = (255, 255, 255)
 
-# Create game
-pygame.init()
-size = width, height = 600, 400
-screen = pygame.display.set_mode(size)
 
-# Fonts
-OPEN_SANS = "assets/fonts/OpenSans-Regular.ttf"
-smallFont = pygame.font.Font(OPEN_SANS, 20)
-mediumFont = pygame.font.Font(OPEN_SANS, 28)
-largeFont = pygame.font.Font(OPEN_SANS, 40)
+class Minesweeper():
+    """
+    Minesweeper game representation
+    """
 
-# Compute board size
-BOARD_PADDING = 20
-board_width = ((2 / 3) * width) - (BOARD_PADDING * 2)
-board_height = height - (BOARD_PADDING * 2)
-cell_size = int(min(board_width / WIDTH, board_height / HEIGHT))
-board_origin = (BOARD_PADDING, BOARD_PADDING)
+    def __init__(self, height=8, width=8, mines=8):
 
-# Add images
-flag = pygame.image.load("assets/images/flag.png")
-flag = pygame.transform.scale(flag, (cell_size, cell_size))
-mine = pygame.image.load("assets/images/mine.png")
-mine = pygame.transform.scale(mine, (cell_size, cell_size))
+        # Set initial width, height, and number of mines
+        self.height = height
+        self.width = width
+        self.mines = set()
 
-# Create game and AI agent
-game = Minesweeper(height=HEIGHT, width=WIDTH, mines=MINES)
-ai = MinesweeperAI(height=HEIGHT, width=WIDTH)
-ai2 = MinesweeperAI(height=HEIGHT, width=WIDTH)
+        # Initialize an empty field with no mines
+        self.board = []
+        for i in range(self.height):
+            row = []
+            for j in range(self.width):
+                row.append(False)
+            self.board.append(row)
 
-# Keep track of revealed cells, flagged cells, and if a mine was hit
-revealed = set()
-flags = set()
-lost = False
+        # Add mines randomly
+        while len(self.mines) != mines:
+            i = random.randrange(height)
+            j = random.randrange(width)
+            if not self.board[i][j]:
+                self.mines.add((i, j))
+                self.board[i][j] = True
 
-# Show instructions initially
-instructions = True
-setToRun1 = False
-setToRun2 = False
-x=0
-y=0
-queue = []
+        # At first, player has found no mines
+        self.mines_found = set()
 
-while True:
+    def print(self):
+        """
+        Prints a text-based representation
+        of where mines are located.
+        """
+        for i in range(self.height):
+            print("--" * self.width + "-")
+            for j in range(self.width):
+                if self.board[i][j]:
+                    print("|X", end="")
+                else:
+                    print("| ", end="")
+            print("|")
+        print("--" * self.width + "-")
 
-    # Check if game quit
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            sys.exit()
+    def is_mine(self, cell):
+        i, j = cell
+        return self.board[i][j]
 
-    screen.fill(BLACK)
+    def nearby_mines(self, cell):
+        """
+        Returns the number of mines that are
+        within one row and column of a given cell,
+        not including the cell itself.
+        """
 
-    # Show game instructions
-    if instructions:
+        # Keep count of nearby mines
+        count = 0
 
-        # Title
-        title = largeFont.render("Play Minesweeper", True, WHITE)
-        titleRect = title.get_rect()
-        titleRect.center = ((width / 2), 50)
-        screen.blit(title, titleRect)
+        # Loop over all cells within one row and column
+        for i in range(cell[0] - 1, cell[0] + 2):
+            for j in range(cell[1] - 1, cell[1] + 2):
 
-        # Rules
-        rules = [
-            "Click a cell to reveal it.",
-            "Right-click a cell to mark it as a mine.",
-            "Mark all mines successfully to win!"
-        ]
-        for i, rule in enumerate(rules):
-            line = smallFont.render(rule, True, WHITE)
-            lineRect = line.get_rect()
-            lineRect.center = ((width / 2), 150 + 30 * i)
-            screen.blit(line, lineRect)
+                # Ignore the cell itself
+                if (i, j) == cell:
+                    continue
 
-        # Play game button
-        buttonRect = pygame.Rect((width / 4), (3 / 4) * height, width / 2, 50)
-        buttonText = mediumFont.render("Play Game", True, BLACK)
-        buttonTextRect = buttonText.get_rect()
-        buttonTextRect.center = buttonRect.center
-        pygame.draw.rect(screen, WHITE, buttonRect)
-        screen.blit(buttonText, buttonTextRect)
+                # Update count if cell in bounds and is mine
+                if 0 <= i < self.height and 0 <= j < self.width:
+                    if self.board[i][j]:
+                        count += 1
 
-        # Check if play button clicked
-        click, _, _ = pygame.mouse.get_pressed()
-        if click == 1:
-            mouse = pygame.mouse.get_pos()
-            if buttonRect.collidepoint(mouse):
-                instructions = False
-                time.sleep(0.3)
+        return count
 
-        pygame.display.flip()
-        continue
+    def won(self):
+        """
+        Checks if all mines have been flagged.
+        """
+        return self.mines_found == self.mines
 
-    # Draw board
-    cells = []
-    for i in range(HEIGHT):
-        row = []
-        for j in range(WIDTH):
+    def getSurrounding(self,cell):
+        queue = []
+        for i in range(cell[0] - 1, cell[0] + 2):
+            for j in range(cell[1] - 1, cell[1] + 2):
 
-            # Draw rectangle for cell
-            rect = pygame.Rect(
-                board_origin[0] + j * cell_size,
-                board_origin[1] + i * cell_size,
-                cell_size, cell_size
-            )
-            pygame.draw.rect(screen, GRAY, rect)
-            pygame.draw.rect(screen, WHITE, rect, 3)
+                # Ignore the cell itself
+                if (i, j) == cell:
+                    continue
 
-            # Add a mine, flag, or number if needed
-            if game.is_mine((i, j)) and lost:
-                screen.blit(mine, rect)
-            elif (i, j) in flags:
-                screen.blit(flag, rect)
-            elif (i, j) in revealed:
-                neighbors = smallFont.render(str(game.nearby_mines((i, j))),True, BLACK)
-                if game.nearby_mines((i, j)) == 0:
-                    queue = game.getSurrounding((i,j))
-                    #print(queue)
-                neighborsTextRect = neighbors.get_rect()
-                neighborsTextRect.center = rect.center
-                screen.blit(neighbors, neighborsTextRect)
+                # Update count if cell in bounds and is mine
+                if 0 <= i < self.height and 0 <= j < self.width:
+                    queue.append((i, j))
 
-            row.append(rect)
-        cells.append(row)
+        return queue
 
-    # AI Move button
-    aiButton = pygame.Rect(
-        (2 / 3) * width + BOARD_PADDING, (1 / 3) * height - 70,
-        (width / 3) - BOARD_PADDING * 2, 50
-    )
-    buttonText = mediumFont.render("AI - 1", True, BLACK)
-    buttonRect = buttonText.get_rect()
-    buttonRect.center = aiButton.center
-    pygame.draw.rect(screen, WHITE, aiButton)
-    screen.blit(buttonText, buttonRect)
+    def scan_section(self,start, size, revealed):
+        board_data = []
+        for i in range(size):
+            x = i + start[0]
+            for j in range(size):
+                y = j + start[1]
+                if(x >= self.height or y >= self.width): #marks area outside board as -2
+                    board_data.append(-2)
+                elif (self.is_mine((x, y))):  # marks bomb tiles as -1
+                    board_data.append(-1)
+                elif((x,y) in revealed):
+                    board_data.append(self.nearby_mines((x,y))) #marks tile with number of bombs surround otherwise
+                else:
+                    board_data.append(-3) #markes tile with -3 if unknown
+        return(board_data)
 
-    # 2nd AI button
-    aiButton2 = pygame.Rect(
-        (2 / 3) * width + BOARD_PADDING, (1 / 3) * height + 10,
-        (width / 3) - BOARD_PADDING * 2, 50
-    )
-    buttonText = mediumFont.render("AI - ANN", True, BLACK)
-    buttonRect = buttonText.get_rect()
-    buttonRect.center = aiButton2.center
-    pygame.draw.rect(screen, WHITE, aiButton2)
-    screen.blit(buttonText, buttonRect)
+    def scan_all_sections(self, size, revealed):
+        sections = []
+        for i in range(0,self.height, size):
+            for j in range(0, self.width, size):
+                sections.append(self.scan_section((i,j),size, revealed))
+        return sections
 
-    # Reset button
-    resetButton = pygame.Rect(
-        (2 / 3) * width + BOARD_PADDING, (1 / 3) * height + 110,
-        (width / 3) - BOARD_PADDING * 2, 50
-    )
-    buttonText = mediumFont.render("Reset", True, BLACK)
-    buttonRect = buttonText.get_rect()
-    buttonRect.center = resetButton.center
-    pygame.draw.rect(screen, WHITE, resetButton)
-    screen.blit(buttonText, buttonRect)
-
-    # Display text
-    text = "Lost" if lost else "Won" if game.mines == flags else ""
-    text = mediumFont.render(text, True, WHITE)
-    textRect = text.get_rect()
-    textRect.center = ((5 / 6) * width, (2 / 3) * height + 60)
-    screen.blit(text, textRect)
-
-    move = None
-
-    if setToRun1 or setToRun2:
-        left = 1
-    else:
-        left, _, right = pygame.mouse.get_pressed()
-
-    # Check for a right-click to toggle flagging
-    if right == 1 and not lost:
-        mouse = pygame.mouse.get_pos()
-        for i in range(HEIGHT):
-            for j in range(WIDTH):
-                if cells[i][j].collidepoint(mouse) and (i, j) not in revealed:
-                    if (i, j) in flags:
-                        flags.remove((i, j))
+    def scan_all_sections_with_safes(self, size, revealed):
+        sections = []
+        section = []
+        safes_section = []
+        for i in range(0,self.height, size):
+            for j in range(0, self.width, size):
+                section = self.scan_section((i,j),size, revealed)
+                safes_section = []
+                for k in range(len(section)):
+                    if(section[k] == -1):
+                        section[k] = -3
+                        safes_section.append(0)
                     else:
-                        flags.add((i, j))
-                    time.sleep(0.2)
-
-    elif left == 1:
-        mouse = pygame.mouse.get_pos()
-
-        # Reset game state
-        if resetButton.collidepoint(mouse):
-            game = Minesweeper(height=HEIGHT, width=WIDTH, mines=MINES)
-            ai = MinesweeperAI(height=HEIGHT, width=WIDTH)
-            ai2 = MinesweeperAI(height=HEIGHT, width=WIDTH)
-            revealed = set()
-            flags = set()
-            lost = False
-            setToRun1 = False
-            setToRun2 = False
-            x=0
-            y=0
-            print("Reset Clicked")
-            continue
-
-        # If AI button clicked, make an AI move
-        elif (aiButton.collidepoint(mouse) and not lost) or (setToRun1 and not lost):
-            print("AI 1")
-            setToRun1 = True
-            move = ai.make_safe_move()
-            if move is None:
-                move = ai.make_random_move()
-                if move is None:
-                    flags = ai.mines.copy()
-                    print("No moves left to make.")
-                    setToRun = False
-                else:
-                    print("No known safe moves, AI making random move.")
-            else:
-                print("AI making safe move.")
-            time.sleep(0.2) #change to speed up game
-
-        elif (aiButton2.collidepoint(mouse) and not lost) or (setToRun2 and not lost):
-            setToRun2 = True
-            print("AI 2")
-            if(x == WIDTH - 4):
-                y += 1
-                x = 0
-            else:
-                x+=1
-
-            if(y == HEIGHT - 3):
-                y=0
-
-            print("Scan Start: ", (x,y), "--- Scan End:", (x + 3, y + 3))
-            #------------------------------------------------
-            rect = pygame.Rect(
-                board_origin[0] + x * cell_size,
-                board_origin[1] + y * cell_size,
-                cell_size, cell_size
-            )
-            pygame.draw.rect(screen, RED, rect)
-
-            rect = pygame.Rect(
-                board_origin[0] + (x + 3) * cell_size,
-                board_origin[1] + (y + 3) * cell_size,
-                cell_size, cell_size
-            )
-            pygame.draw.rect(screen, RED, rect)
-            #------------------------------------------------
-            move = ai2.make_nn_move(game.scan_section((x,y),4,revealed),x,y)
-
-            if move is None:
-                move = (int(WIDTH / 2), int(HEIGHT / 2))
-                print("Middle: ", move)
-                if move is None:
-                    flags = ai2.mines.copy()
-                    print("No moves left to make.")
-                    setToRun2 = False
-                else:
-                    print("No known safe moves.")
-            else:
-                move = (move[0] + x, move[1] + y)
-                print("Move: ", move)
-                move = (move[1], move[0])
-                print("AI making most probable move.")
-                #---------------------------------------------
-                rect = pygame.Rect(
-                    board_origin[0] + move[1] * cell_size,
-                    board_origin[1] + move[0] * cell_size,
-                    cell_size, cell_size
-                )
-                pygame.draw.rect(screen, BLUE, rect)
-                #----------------------------------------------
-                if move in revealed:
-                    print("REPEATED MOVE: ", move)
-            time.sleep(0.2)
+                        safes_section.append(1)
+                sections.append(section + safes_section)
+        return sections
 
 
-        # User-made move
-        elif not lost:
-            for i in range(HEIGHT):
-                for j in range(WIDTH):
-                    if (cells[i][j].collidepoint(mouse)
-                            and (i, j) not in flags
-                            and (i, j) not in revealed):
-                        move = (i, j)
 
-    # Make move and update AI knowledge
-    if move:
-        if game.is_mine(move):
-            setToRun1 = False
-            setToRun2 = False
-            x=0
-            y=0
-            lost = True
+class Sentence():
+    """
+    Logical statement about a Minesweeper game
+    A sentence consists of a set of board cells,
+    and a count of the number of those cells which are mines.
+    """
+
+    def __init__(self, cells, count):
+        self.cells = set(cells)
+        self.count = count
+
+    def __eq__(self, other):
+        return self.cells == other.cells and self.count == other.count
+
+    def __str__(self):
+        return f"{self.cells} = {self.count}"
+
+    def known_mines(self):
+        """
+        Returns the set of all cells in self.cells known to be mines.
+        """
+        known_mines = set()
+        if len(self.cells)==self.count:
+            for cell in self.cells:
+                #cell = True
+                known_mines.add(cell)
+            #print(f'known_mines is {known_mines}')
+            return known_mines
         else:
-            nearby = game.nearby_mines(move)
-            revealed.add(move)
-            ai.add_knowledge(move, nearby)
-            ai2.add_knowledge(move, nearby)
-            data = game.scan_all_sections_with_safes(4, revealed)
+            return set()
 
-            for eachList in data:
-                if(eachList[:16] != [-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3]):
-                    with open('board_data.csv', 'a', newline ='') as f: #file heading:(0;0),(1;0),(2;0),(3;0),(0;1),(1;1),(2;1),(3;1),(0;2),(1;2),(2;2),(3;2),(0;3),(1;3),(2;3),(3;3),s(0;0),s(1;0),s(2;0),s(3;0),s(0;1),s(1;1),s(2;1),s(3;1),s(0;2),s(1;2),s(2;2),s(3;2),s(0;3),s(1;3),s(2;3),s(3;3)
-                        writer_obj = writer(f)
-                        writer_obj.writerow(eachList)
-                        f.close()
-    pygame.display.flip()
+
+    def known_safes(self):
+        """
+        Returns the set of all cells in self.cells known to be safe.
+        """
+        known_safes = set()
+        if self.count==0:
+            for cell in self.cells:
+                #cell = False
+                known_safes.add(cell)
+            #print(f'known_safes is {known_safes}')
+            return known_safes
+        else:
+            return set()
+
+
+    def mark_mine(self, cell):
+        """
+        Updates internal knowledge representation given the fact that
+        a cell is known to be a mine.
+        """
+        if cell in self.cells:
+            self.cells.remove(cell)
+            self.count -= 1
+
+
+    def mark_safe(self, cell):
+        """
+        Updates internal knowledge representation given the fact that
+        a cell is known to be safe.
+        """
+        if cell in self.cells:
+            self.cells.remove(cell)
+
+class MinesweeperAI(): #This is the main function to edit
+    """
+    Minesweeper game player
+    """
+
+    def __init__(self, height=8, width=8):
+
+        # Set initial height and width
+        self.height = height
+        self.width = width
+
+        # Keep track of which cells have been clicked on
+        self.moves_made = set()
+
+        # Keep track of cells known to be safe or mines
+        self.mines = set()
+        self.safes = set()
+
+        # List of sentences about the game known to be true
+        self.knowledge = []
+        self.bomb_chance = {}
+        self.bomb_chance_surrounding = {}
+        for i in range(height):
+            for j in range(width):
+                coord = str(i)+ ", "+ str(j)
+                self.bomb_chance.update({coord : 0})
+        for k in range(height):
+            for m in range(width):
+                coord = str(k)+ ", "+ str(m)
+                self.bomb_chance_surrounding.update({coord : 0})
+        print(self.bomb_chance)
+
+    def mark_mine(self, cell):
+        """
+        Marks a cell as a mine, and updates all knowledge
+        to mark that cell as a mine as well.
+        """
+        self.mines.add(cell)
+        for sentence in self.knowledge:
+            sentence.mark_mine(cell)
+
+    def mark_safe(self, cell):
+        """
+        Marks a cell as safe, and updates all knowledge
+        to mark that cell as safe as well.
+        """
+        self.safes.add(cell)
+        for sentence in self.knowledge:
+            sentence.mark_safe(cell)
+
+    def add_knowledge(self, cell, count):
+        """
+        Called when the Minesweeper board tells us, for a given
+        safe cell, how many neighboring cells have mines in them.
+
+        This function should:
+            1) mark the cell as a move that has been made
+            2) mark the cell as safe
+            3) add a new sentence to the AI's knowledge base
+               based on the value of `cell` and `count`
+            4) mark any additional cells as safe or as mines
+               if it can be concluded based on the AI's knowledge base
+            5) add any new sentences to the AI's knowledge base
+               if they can be inferred from existing knowledge
+        """
+        self.moves_made.add(cell)       #1.
+        #print("1 executed")
+        
+        self.mark_safe(cell)            #2.
+        #print("2 executed")
+                
+        cells = set()                   #3.
+        
+        for i in range(cell[0] - 1, cell[0] + 2):
+            for j in range(cell[1] - 1, cell[1] + 2):
+                if 0 <= i < self.height and 0 <= j < self.width:
+                    if (i,j)!=cell and (i,j) not in (self.safes or self.mines):
+                        cells.add((i,j))
+        if len(cells)!= 0 and Sentence(cells,count) not in self.knowledge:
+            self.knowledge.append(Sentence(cells,count))
+        #print("3 executed")
+    
+        for sent in self.knowledge:     #4.
+            self.mines = self.mines.union(sent.known_mines())
+            self.safes = self.safes.union(sent.known_safes())
+        #print("4 executed")
+        
+
+        knowledge_subset = []
+        for i in self.knowledge:        #5.
+            if len(i.cells)==0:
+                self.knowledge.remove(i)
+                continue
+            for j in self.knowledge:
+                if i.cells != j.cells and i.cells.issubset(j.cells) and Sentence(j.cells.difference(i.cells),j.count-i.count) not in self.knowledge and j.count!=0 :
+                    self.knowledge.append(Sentence(j.cells.difference(i.cells),j.count-i.count))
+                
+                
+        print(len(self.moves_made.union(self.mines)))
+        #print("5 executed")
+               
+        #return self.knowledge
+        
+
+
+    def make_safe_move(self):
+        """
+        Returns a safe cell to choose on the Minesweeper board.
+        The move must be known to be safe, and not already a move
+        that has been made.
+
+        This function may use the knowledge in self.mines, self.safes
+        and self.moves_made, but should not modify any of those values.
+        """
+        move = None
+        if len(self.safes.difference(self.moves_made))!=0:
+            move = random.sample(self.safes.difference(self.moves_made),1)[0]
+            #print(f"make safe move running {move}")
+            return move
+        else:
+            return None
+        
+
+
+    def make_random_move(self):
+        """
+        Returns a move to make on the Minesweeper board.
+        Should choose randomly among cells that:
+            1) have not already been chosen, and
+            2) are not known to be mines
+        """
+        while len(self.moves_made.union(self.mines))< 64-len(self.mines):
+            i,j = random.randrange(0,self.width),random.randrange(0,self.height)
+            if (i,j) in self.moves_made.union(self.mines):
+                self.make_random_move()
+            else:
+                #print(f"make random move running {(i,j)}")
+                return (i,j)
+        return None
+
+    def make_nn_move(self,board_section,i,j):
+        availMoves = 0
+        board_section = [-3 if item == -1 else item for item in board_section] #replaces bomb tiles with unknown
+        print(board_section)
+        if board_section == [-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3]: #board with no info
+            print("EMPTY")
+            return
+        import tensorflow as tf
+        from tensorflow import keras
+        model = tf.keras.models.load_model('my_minesweeper_model.h5')
+
+        board_state = pd.DataFrame([board_section], columns=['(0;0)', '(1;0)', '(2;0)', '(3;0)', '(0;1)', '(1;1)', '(2;1)', '(3;1)', '(0;2)', '(1;2)', '(2;2)', '(3;2)', '(0;3)', '(1;3)', '(2;3)', '(3;3)'])
+        probs = model.predict(board_state).tolist()
+        print(probs)
+        maxProb = -9999
+        maxCoord = (0,0)
+        for ndx in range(len(probs[0])):
+            y = int(ndx / 4)
+            x = ndx % 4
+            coord = (x, y)
+            if (y+j, x+i) not in self.moves_made:
+                availMoves += 1
+            if(((y+j, x+i) not in self.moves_made) and (probs[0][ndx] > maxProb)):
+                print(probs[0][ndx], ": ", coord)
+                maxProb = probs[0][ndx]
+                maxCoord = coord
+        print("Move Within Section: ", (maxCoord))
+
+        if maxProb != -9999 and availMoves > 1:
+            print("index:", probs[0].index(maxProb))
+            return maxCoord
+        else:
+            print("No moves in this section.")
+
+
+
+
+
