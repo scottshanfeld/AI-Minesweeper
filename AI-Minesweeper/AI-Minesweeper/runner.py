@@ -10,9 +10,9 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-HEIGHT = 8
-WIDTH = 8
-MINES = 2
+HEIGHT = 12 #keep this a multiple of 4 and same as width
+WIDTH = 12
+MINES = 5
 
 # Colors
 BLACK = (0, 0, 0)
