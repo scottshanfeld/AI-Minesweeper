@@ -357,6 +357,7 @@ class MinesweeperAI(): #This is the main function to edit
         return None
 
     def make_nn_move(self,board_section,i,j):
+        availMoves = 0
         board_section = [-3 if item == -1 else item for item in board_section] #replaces bomb tiles with unknown
         print(board_section)
         if board_section == [-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3,-3]: #board with no info
@@ -375,13 +376,15 @@ class MinesweeperAI(): #This is the main function to edit
             y = int(ndx / 4)
             x = ndx % 4
             coord = (x, y)
+            if (y+j, x+i) not in self.moves_made:
+                availMoves += 1
             if(((y+j, x+i) not in self.moves_made) and (probs[0][ndx] > maxProb)):
                 print(probs[0][ndx], ": ", coord)
                 maxProb = probs[0][ndx]
                 maxCoord = coord
         print("Move Within Section: ", (maxCoord))
 
-        if maxProb != -9999:
+        if maxProb != -9999 and availMoves > 1:
             print("index:", probs[0].index(maxProb))
             return maxCoord
         else:
