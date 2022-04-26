@@ -19,18 +19,18 @@ model.add(Dense((10 * n), activation='relu'))  # 1st layer -- input layer
 model.add(Dense((20 * n), activation='relu'))  # 2nd layer
 model.add(Dense((10 * n), activation='relu'))  # 3rd layer
 model.add(Dense((5 * n), activation='sigmoid'))  # 4th layer
-model.add(Dense(n))  # output (may change n to 1 if we decide to only have 1 output. Currently set up to output a percent chance of a bomb at a given space)
-model.compile(optimizer='adam', loss='binary_crossentropy')  # main function to imporve nn
-model.fit(x=x_train, y=y_train,epochs=300)  # epochs -> number of pass over the entired dataset ->this is where neural network is run
-loss_df = pd.DataFrame(model.history.history)
-model.evaluate(X_test, y_test, verbose=0) # returns mean square error
-model.evaluate(x_train, y_train, verbose=0)
-test_predictions = model.predict(X_test)
-test_predictions = pd.Series(test_predictions.flatten()) #converting to dataframe
-pred_df = pd.DataFrame(y_test, columns=['orig s(0;0)', 'orig s(1;0)', 'orig s(2;0)', 'orig s(3;0)', 'orig s(0;1)', 'orig s(1;1)', 'orig s(2;1)', 'orig s(3;1)', 'orig s(0;2)', 'orig s(1;2)', 'orig s(2;2)', 'orig s(3;2)', 'orig s(0;3)', 'orig s(1;3)', 'orig s(2;3)', 'orig s(3;3)'])
-pred_df = pd.concat([pred_df, test_predictions], axis=1)
-pred_df.columns = ['orig s(0;0)', 'orig s(1;0)', 'orig s(2;0)', 'orig s(3;0)', 'orig s(0;1)', 'orig s(1;1)', 'orig s(2;1)', 'orig s(3;1)', 'orig s(0;2)', 'orig s(1;2)', 'orig s(2;2)', 'orig s(3;2)', 'orig s(0;3)', 'orig s(1;3)', 'orig s(2;3)', 'orig s(3;3)', 'Predictions']
-loss_df.plot()
+model.add(Dense(n))  # output
+model.compile(optimizer='adam', loss='binary_crossentropy')
+model.fit(x=x_train, y=y_train,epochs=300)
+#loss_df = pd.DataFrame(model.history.history)
+#model.evaluate(X_test, y_test, verbose=0) # returns mean square error
+#model.evaluate(x_train, y_train, verbose=0)
+#test_predictions = model.predict(X_test)
+#test_predictions = pd.Series(test_predictions.Bflatten()) #converting to dataframe
+#pred_df = pd.DataFrame(y_test, columns=['orig s(0;0)', 'orig s(1;0)', 'orig s(2;0)', 'orig s(3;0)', 'orig s(0;1)', 'orig s(1;1)', 'orig s(2;1)', 'orig s(3;1)', 'orig s(0;2)', 'orig s(1;2)', 'orig s(2;2)', 'orig s(3;2)', 'orig s(0;3)', 'orig s(1;3)', 'orig s(2;3)', 'orig s(3;3)'])
+#pred_df = pd.concat([pred_df, test_predictions], axis=1)
+#pred_df.columns = ['orig s(0;0)', 'orig s(1;0)', 'orig s(2;0)', 'orig s(3;0)', 'orig s(0;1)', 'orig s(1;1)', 'orig s(2;1)', 'orig s(3;1)', 'orig s(0;2)', 'orig s(1;2)', 'orig s(2;2)', 'orig s(3;2)', 'orig s(0;3)', 'orig s(1;3)', 'orig s(2;3)', 'orig s(3;3)', 'Predictions']
+#loss_df.plot()
 #Saves model
 from tensorflow.keras.models import load_model
 model.save('my_minesweeper_model.h5')
